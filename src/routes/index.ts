@@ -5,6 +5,7 @@ import { CategoryController } from '../controllers/CategoryController';
 import { OrderController } from '../controllers/OrderController';
 import { StockController } from '../controllers/StockController';
 import { LogController } from '../controllers/LogController';
+import { DashboardController } from '../controllers/DashboardController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -16,10 +17,17 @@ const categoryController = new CategoryController();
 const orderController = new OrderController();
 const stockController = new StockController();
 const logController = new LogController();
+const dashboardController = new DashboardController();
 
 // Auth routes (public)
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+
+// Dashboard routes
+router.get('/dashboard/stats', dashboardController.getStats);
+router.get('/dashboard/recent-orders', dashboardController.getRecentOrders);
+router.get('/dashboard/low-stock', dashboardController.getLowStock);
+router.get('/dashboard/summary', dashboardController.getSummary);
 
 // Product routes (PUBLIC - matching Spring Boot permitAll)
 router.get('/products', productController.getAllProducts);
