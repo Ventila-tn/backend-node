@@ -71,13 +71,23 @@ export class ProductController {
     try {
       const id = parseInt(req.params.id);
       const request: ProductRequest = req.body;
-      const product = await this.productService.createOrUpdateProduct(request, id);
       
-      // Mettre à jour les images
-      if (request.imageUrls) {
+      // Séparer les images du reste des données
+      const productData = { ...request };
+      const imageUrls = productData.imageUrls;
+      delete productData.imageUrls; // Retirer les images des données principales
+      
+      console.log('📝 Mise à jour produit sans images:', { id, hasImages: !!imageUrls?.length });
+      
+      const product = await this.productService.createOrUpdateProduct(productData, id);
+      
+      // Mettre à jour les images séparément seulement si elles sont fournies
+      if (imageUrls !== undefined) {
+        console.log('🖼️ Mise à jour images:', imageUrls.length, 'images');
         await this.deleteProductImages(id);
-        if (request.imageUrls.length > 0) {
-          await this.saveProductImages(id, request.imageUrls);
+        if (imageUrls.length > 0) {
+          // Traiter les images par petits lots pour éviter les timeouts
+          await this.saveProductImages(id, imageUrls);
         }
       }
       
@@ -85,6 +95,7 @@ export class ProductController {
       const dto = await this.mapToDTOWithImages(result!.product, result!.imageUrls);
       res.json(dto);
     } catch (error: any) {
+      console.error('❌ Erreur updateProduct:', error);
       res.status(400).json({ message: error.message });
     }
   };
@@ -95,6 +106,40 @@ export class ProductController {
       await this.productService.deleteOrDeactivate(id);
       res.status(204).send();
     } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  // Endpoint séparé pour uploader les images d'un produit
+  updateProductImages = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { imageUrls } = req.body;
+      
+      if (!Array.isArray(imageUrls)) {
+        return res.status(400).json({ message: 'imageUrls must be an array' });
+      }
+
+      console.log('🖼️ Upload images pour produit', id, ':', imageUrls.length, 'images');
+
+      // Vérifier que le produit existe
+      const product = await this.productService.findById(id);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      // Remplacer toutes les images
+      await this.deleteProductImages(id);
+      if (imageUrls.length > 0) {
+        await this.saveProductImages(id, imageUrls);
+      }
+
+      // Retourner le produit avec ses nouvelles images
+      const result = await this.productService.findByIdWithImages(id);
+      const dto = await this.mapToDTOWithImages(result!.product, result!.imageUrls);
+      res.json({ message: 'Images updated successfully', product: dto });
+    } catch (error: any) {
+      console.error('❌ Erreur updateProductImages:', error);
       res.status(400).json({ message: error.message });
     }
   };

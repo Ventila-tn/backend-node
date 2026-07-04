@@ -37,6 +37,7 @@ router.get('/products/archived', productController.getArchivedProducts);
 router.get('/products/:id', productController.getProduct);
 router.post('/products', productController.createProduct);
 router.put('/products/:id', productController.updateProduct);
+router.put('/products/:id/images', productController.updateProductImages); // Nouvel endpoint pour images
 router.delete('/products/:id', productController.deleteProduct);
 router.post('/products/:id/reactivate', productController.reactivateProduct);
 
