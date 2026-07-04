@@ -24,11 +24,23 @@ export class SettingsController {
 
   updateDeliveryFee = async (req: Request, res: Response) => {
     try {
-      // Express body-parser already parses JSON, so req.body is the number directly
-      const fee = typeof req.body === 'number' ? req.body : parseFloat(req.body);
+      // Angular sends the number directly in the body (not wrapped in an object)
+      // So req.body is the number itself
+      let fee: number;
+      
+      if (typeof req.body === 'number') {
+        fee = req.body;
+      } else if (typeof req.body === 'string') {
+        fee = parseFloat(req.body);
+      } else if (typeof req.body === 'object' && req.body.fee !== undefined) {
+        fee = parseFloat(req.body.fee);
+      } else {
+        console.error('Invalid delivery fee format:', req.body);
+        return res.status(400).json({ message: 'Invalid delivery fee format' });
+      }
       
       if (isNaN(fee) || fee < 0) {
-        return res.status(400).json({ message: 'Invalid delivery fee' });
+        return res.status(400).json({ message: 'Invalid delivery fee value' });
       }
 
       // Ensure settings table exists
@@ -50,6 +62,7 @@ export class SettingsController {
 
       res.json(fee);
     } catch (error: any) {
+      console.error('Error updating delivery fee:', error);
       res.status(500).json({ message: error.message });
     }
   };
