@@ -186,6 +186,35 @@ export class ProductController {
     }
   };
 
+  // Route alternative POST pour une seule image (contournement 404)
+  addSingleImage = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { imageUrl } = req.body;
+      
+      if (!imageUrl || typeof imageUrl !== 'string') {
+        return res.status(400).json({ message: 'imageUrl is required' });
+      }
+
+      console.log(`🖼️ Ajout image via route POST pour produit ${id}`);
+
+      // Vérifier que le produit existe
+      const product = await this.productService.findById(id);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      // Ajouter l'image
+      await this.saveProductImages(id, [imageUrl]);
+
+      // Retourner succès
+      res.json({ message: 'Image added successfully' });
+    } catch (error: any) {
+      console.error('❌ Erreur addSingleImage:', error);
+      res.status(400).json({ message: error.message });
+    }
+  };
+
   reactivateProduct = async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
