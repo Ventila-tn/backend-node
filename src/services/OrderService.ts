@@ -21,6 +21,7 @@ export class OrderService {
       // Create order
       const orderResult = await client.query<Order>(
         `INSERT INTO orders (
+           user_id,
            first_name, 
            last_name, 
            address, 
@@ -34,9 +35,10 @@ export class OrderService {
            order_date, 
            total_amount
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), 0)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), 0)
          RETURNING *`,
         [
+          null, // user_id - null for guest checkout
           request.firstName,
           request.lastName,
           request.address,
