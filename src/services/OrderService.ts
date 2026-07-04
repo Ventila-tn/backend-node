@@ -18,6 +18,14 @@ export class OrderService {
     try {
       await client.query('BEGIN');
 
+      // Generate order reference: CMD-YYYYMMDD-RANDOM
+      const date = new Date();
+      const dateStr = date.getFullYear().toString() + 
+                      (date.getMonth() + 1).toString().padStart(2, '0') + 
+                      date.getDate().toString().padStart(2, '0');
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const reference = `CMD-${dateStr}-${random}`;
+
       // Create order
       const orderResult = await client.query<Order>(
         `INSERT INTO orders (
@@ -50,7 +58,7 @@ export class OrderService {
           request.deliveryFee || 0,
           OrderStatus.PENDING_CONFIRMATION,
           false,
-          null // reference - null until generated/assigned
+          reference
         ]
       );
 
