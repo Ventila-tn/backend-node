@@ -131,7 +131,7 @@ export interface ProductRequest {
   profitMarginPercent: number;
   vatPercent: number;
   characteristics: Record<string, string> | null;
-  imageUrls: string[];
+  imageUrls?: string[]; // Rendu optionnel avec ?
 }
 
 export interface CheckoutRequest {

@@ -93,11 +93,12 @@ export class ProductController {
       // Traiter normalement si pas d'images ou images légères
       const productData = { ...request };
       const imageUrls = productData.imageUrls;
-      delete productData.imageUrls;
+      // Créer un objet sans imageUrls au lieu d'utiliser delete
+      const { imageUrls: _, ...productDataWithoutImages } = productData;
       
       console.log('📝 Mise à jour produit sans images:', { id, hasImages: !!imageUrls?.length });
       
-      const product = await this.productService.createOrUpdateProduct(productData, id);
+      const product = await this.productService.createOrUpdateProduct(productDataWithoutImages as ProductRequest, id);
       
       // Traiter les images seulement si légères
       if (imageUrls !== undefined) {
