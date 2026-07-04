@@ -65,8 +65,36 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    // Generate token
-    const token = this.generateToken(user);
+    // Récupérer les rôles - gestion de la compatibilité Spring Boot
+    let roles: UserRole[] = [];
+    
+    if (user.roles) {
+      // Si roles existe dans la table users (format Node.js ou Spring Boot avec jsonb)
+      if (typeof user.roles === 'string') {
+        try {
+          roles = JSON.parse(user.roles);
+        } catch {
+          roles = [UserRole.ROLE_CLIENT];
+        }
+      } else if (Array.isArray(user.roles)) {
+        roles = user.roles;
+      }
+    } else {
+      // Si pas de roles dans users, chercher dans user_roles (format Spring Boot)
+      const rolesResult = await pool.query(
+        'SELECT roles FROM user_roles WHERE user_id = $1',
+        [user.id]
+      );
+      
+      if (rolesResult.rows.length > 0) {
+        roles = rolesResult.rows.map(row => row.roles as UserRole);
+      } else {
+        roles = [UserRole.ROLE_CLIENT];
+      }
+    }
+
+    // Generate token with roles
+    const token = this.generateToken({ ...user, roles });
 
     return { token };
   }
