@@ -24,7 +24,8 @@ export class SettingsController {
 
   updateDeliveryFee = async (req: Request, res: Response) => {
     try {
-      const fee = parseFloat(req.body.toString());
+      // Express body-parser already parses JSON, so req.body is the number directly
+      const fee = typeof req.body === 'number' ? req.body : parseFloat(req.body);
       
       if (isNaN(fee) || fee < 0) {
         return res.status(400).json({ message: 'Invalid delivery fee' });
