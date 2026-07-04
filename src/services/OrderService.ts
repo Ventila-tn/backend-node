@@ -18,6 +18,28 @@ export class OrderService {
     try {
       await client.query('BEGIN');
 
+      // S'assurer que deliveryFee est un nombre valide
+      let deliveryFee = 0;
+      if (request.deliveryFee !== null && request.deliveryFee !== undefined && !isNaN(request.deliveryFee)) {
+        deliveryFee = Number(request.deliveryFee);
+      } else {
+        // Fallback: récupérer depuis les settings si pas fourni
+        console.log('⚠️ deliveryFee manquant ou invalide, récupération depuis settings');
+        try {
+          const settingsResult = await client.query(
+            "SELECT value FROM settings WHERE key = 'delivery_fee' LIMIT 1"
+          );
+          if (settingsResult.rows.length > 0) {
+            deliveryFee = parseFloat(settingsResult.rows[0].value) || 0;
+          }
+        } catch (error) {
+          console.error('Erreur récupération delivery_fee:', error);
+          deliveryFee = 7; // valeur par défaut
+        }
+      }
+
+      console.log('💰 Frais de livraison utilisés pour la commande:', deliveryFee);
+
       // Generate order reference: CMD-YYYYMMDD-RANDOM
       const date = new Date();
       const dateStr = date.getFullYear().toString() + 
@@ -55,7 +77,7 @@ export class OrderService {
           request.email,
           request.city || null,
           request.governorate || null,
-          request.deliveryFee || 0,
+          deliveryFee, // utilise la valeur vérifiée
           OrderStatus.PENDING_CONFIRMATION,
           false,
           reference
@@ -106,7 +128,13 @@ export class OrderService {
       }
 
       // Add delivery fee to total
-      totalAmount += (request.deliveryFee || 0);
+      totalAmount += deliveryFee;
+
+      console.log('📊 Calcul total commande:', {
+        subtotal: totalAmount - deliveryFee,
+        deliveryFee: deliveryFee,
+        total: totalAmount
+      });
 
       // Update order with total and shortage flag
       const updatedOrderResult = await client.query<Order>(

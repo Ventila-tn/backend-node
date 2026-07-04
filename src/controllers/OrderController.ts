@@ -12,9 +12,25 @@ export class OrderController {
   checkout = async (req: Request, res: Response) => {
     try {
       const request: CheckoutRequest = req.body;
+      
+      console.log('📥 Requête checkout reçue:', {
+        ...request,
+        deliveryFee: request.deliveryFee,
+        deliveryFeeType: typeof request.deliveryFee
+      });
+
       const order = await this.orderService.placeOrder(request);
+      
+      console.log('✅ Commande créée avec succès:', {
+        id: order.id,
+        reference: order.reference,
+        deliveryFee: order.delivery_fee,
+        totalAmount: order.total_amount
+      });
+      
       res.status(200).json(this.mapOrderToDTO(order));
     } catch (error: any) {
+      console.error('❌ Erreur checkout:', error);
       res.status(400).json({ message: error.message });
     }
   };
