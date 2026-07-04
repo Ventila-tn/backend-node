@@ -33,9 +33,10 @@ export class OrderService {
            status, 
            has_stock_shortage, 
            order_date, 
-           total_amount
+           total_amount,
+           reference
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), 0)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), 0, $12)
          RETURNING *`,
         [
           null, // user_id - null for guest checkout
@@ -48,7 +49,8 @@ export class OrderService {
           request.governorate || null,
           request.deliveryFee || 0,
           OrderStatus.PENDING_CONFIRMATION,
-          false
+          false,
+          null // reference - null until generated/assigned
         ]
       );
 
