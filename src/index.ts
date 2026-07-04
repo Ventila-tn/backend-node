@@ -20,8 +20,27 @@ app.use(cors({
   credentials: corsOrigin !== '*'
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Middleware pour vérifier la taille du payload AVANT traitement
+app.use('/api/products', (req, res, next) => {
+  const contentLength = parseInt(req.headers['content-length'] || '0');
+  const maxSize = 2 * 1024 * 1024; // 2MB limite très sécurisée pour Vercel
+  
+  if (contentLength > maxSize) {
+    console.log(`🚫 Payload trop gros: ${contentLength} bytes (max: ${maxSize})`);
+    return res.status(413).json({ 
+      error: 'Payload too large',
+      message: 'Les images sont trop lourdes. Utilisez l\'endpoint /images ou compressez davantage.',
+      maxSize: maxSize,
+      receivedSize: contentLength,
+      recommendation: 'Utilisez PUT /api/products/{id}/images pour les images'
+    });
+  }
+  
+  next();
+});
+
+app.use(express.json({ limit: '3mb' })); // Réduit de 10mb à 3mb
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
 // API routes
 app.use('/api', routes);

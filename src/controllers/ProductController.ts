@@ -72,21 +72,38 @@ export class ProductController {
       const id = parseInt(req.params.id);
       const request: ProductRequest = req.body;
       
-      // Séparer les images du reste des données
+      // FORCER la séparation : rejeter si images incluses
+      if (request.imageUrls && request.imageUrls.length > 0) {
+        // Calculer la taille approximative des images
+        const totalImageSize = request.imageUrls.reduce((total, url) => {
+          return total + (url.length * 0.75); // Base64 fait ~75% de la taille binaire
+        }, 0);
+        
+        if (totalImageSize > 2 * 1024 * 1024) { // 2MB pour images
+          return res.status(413).json({
+            error: 'Images too large',
+            message: 'Utilisez l\'endpoint /products/{id}/images pour uploader les images séparément',
+            suggestedEndpoint: `/api/products/${id}/images`,
+            imageCount: request.imageUrls.length,
+            estimatedSize: Math.round(totalImageSize / 1024) + ' KB'
+          });
+        }
+      }
+      
+      // Traiter normalement si pas d'images ou images légères
       const productData = { ...request };
       const imageUrls = productData.imageUrls;
-      delete productData.imageUrls; // Retirer les images des données principales
+      delete productData.imageUrls;
       
       console.log('📝 Mise à jour produit sans images:', { id, hasImages: !!imageUrls?.length });
       
       const product = await this.productService.createOrUpdateProduct(productData, id);
       
-      // Mettre à jour les images séparément seulement si elles sont fournies
+      // Traiter les images seulement si légères
       if (imageUrls !== undefined) {
-        console.log('🖼️ Mise à jour images:', imageUrls.length, 'images');
+        console.log('🖼️ Traitement images légères:', imageUrls.length, 'images');
         await this.deleteProductImages(id);
         if (imageUrls.length > 0) {
-          // Traiter les images par petits lots pour éviter les timeouts
           await this.saveProductImages(id, imageUrls);
         }
       }
