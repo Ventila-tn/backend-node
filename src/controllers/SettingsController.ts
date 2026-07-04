@@ -24,31 +24,33 @@ export class SettingsController {
 
   updateDeliveryFee = async (req: Request, res: Response) => {
     try {
-      console.log('Received body:', req.body, 'Type:', typeof req.body);
+      console.log('Received body:', JSON.stringify(req.body), 'Type:', typeof req.body);
       console.log('Content-Type:', req.headers['content-type']);
       
-      // Angular sends the number directly in the body (not wrapped in an object)
-      // So req.body is the number itself
       let fee: number;
       
+      // Handle different body formats
       if (typeof req.body === 'number') {
+        // Direct number (shouldn't happen with express.json())
         fee = req.body;
-      } else if (typeof req.body === 'string') {
-        fee = parseFloat(req.body);
       } else if (typeof req.body === 'object' && req.body !== null) {
-        // Handle case where body might be an object with the value
-        if (req.body.fee !== undefined) {
+        // Object with value property (expected format)
+        if ('value' in req.body) {
+          fee = parseFloat(req.body.value);
+        } else if ('fee' in req.body) {
           fee = parseFloat(req.body.fee);
-        } else if (Object.keys(req.body).length === 0) {
-          // Empty object, might be parsing issue
-          return res.status(400).json({ message: 'Empty request body' });
         } else {
-          // Try to get the first value
-          const firstValue = Object.values(req.body)[0];
-          fee = parseFloat(String(firstValue));
+          console.error('Invalid body structure:', req.body);
+          return res.status(400).json({ 
+            message: 'Invalid request body. Expected { value: number }',
+            received: req.body
+          });
         }
+      } else if (typeof req.body === 'string') {
+        // String number
+        fee = parseFloat(req.body);
       } else {
-        console.error('Invalid delivery fee format:', req.body);
+        console.error('Invalid delivery fee type:', typeof req.body);
         return res.status(400).json({ 
           message: 'Invalid delivery fee format',
           received: req.body,
@@ -58,7 +60,7 @@ export class SettingsController {
       
       if (isNaN(fee) || fee < 0) {
         return res.status(400).json({ 
-          message: 'Invalid delivery fee value',
+          message: 'Invalid delivery fee value. Must be a positive number.',
           value: fee
         });
       }
