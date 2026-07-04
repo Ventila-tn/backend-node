@@ -129,4 +129,25 @@ export class ProductService {
     
     return result.rows;
   }
+
+  async findByIdWithImages(id: number): Promise<{ product: Product; imageUrls: string[] } | null> {
+    const productResult = await pool.query<Product>(
+      'SELECT * FROM products WHERE id = $1',
+      [id]
+    );
+
+    if (productResult.rows.length === 0) {
+      return null;
+    }
+
+    const imagesResult = await pool.query<{ image_url: string }>(
+      'SELECT image_url FROM product_images WHERE product_id = $1',
+      [id]
+    );
+
+    return {
+      product: productResult.rows[0],
+      imageUrls: imagesResult.rows.map(row => row.image_url)
+    };
+  }
 }
