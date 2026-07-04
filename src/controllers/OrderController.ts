@@ -90,7 +90,7 @@ export class OrderController {
       reference: order.reference,
       city: order.city,
       governorate: order.governorate,
-      deliveryFee: order.delivery_fee ? Number(order.delivery_fee) : null
+      deliveryFee: Number(order.delivery_fee) || 0
     };
   }
 }
