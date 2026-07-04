@@ -46,6 +46,8 @@ export class AuthService {
   }
 
   async login(request: AuthRequest): Promise<AuthResponse> {
+    console.log('Login attempt for username:', request.username);
+    
     // Find user
     const result = await pool.query<User>(
       'SELECT * FROM users WHERE username = $1',
@@ -53,17 +55,22 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
+      console.log('User not found:', request.username);
       throw new Error('Invalid credentials');
     }
 
     const user = result.rows[0];
+    console.log('User found, verifying password...');
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(request.password, user.password);
 
     if (!isPasswordValid) {
+      console.log('Invalid password for user:', request.username);
       throw new Error('Invalid credentials');
     }
+
+    console.log('Password valid, generating token...');
 
     // Récupérer les rôles - gestion de la compatibilité Spring Boot
     let roles: UserRole[] = [];
@@ -93,8 +100,11 @@ export class AuthService {
       }
     }
 
+    console.log('Roles found:', roles);
+
     // Generate token with roles
     const token = this.generateToken({ ...user, roles });
+    console.log('Token generated successfully');
 
     return { token };
   }
