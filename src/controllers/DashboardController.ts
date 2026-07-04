@@ -6,103 +6,180 @@ export class DashboardController {
   getStats = async (req: Request, res: Response) => {
     try {
       const days = parseInt(req.query.days as string) || 7;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      const from = req.query.from as string;
+      const to = req.query.to as string;
+      
+      let startDate: Date;
+      let endDate = new Date();
 
-      // Statistiques des commandes
-      const ordersResult = await pool.query(
-        `SELECT 
-           COUNT(*) as total_orders,
-           COALESCE(SUM(total_amount), 0) as total_revenue,
-           COALESCE(AVG(total_amount), 0) as average_order_value
-         FROM orders
-         WHERE order_date >= $1`,
-        [startDate]
+      if (from && to) {
+        startDate = new Date(from);
+        endDate = new Date(to);
+      } else {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+      }
+
+      // 1. Statistiques des logs (visiteurs)
+      const totalVisitsResult = await pool.query(
+        'SELECT COUNT(*) as count FROM log_entries WHERE timestamp >= $1 AND timestamp <= $2',
+        [startDate, endDate]
       );
 
-      // Commandes par statut
-      const ordersByStatusResult = await pool.query(
-        `SELECT 
-           status,
-           COUNT(*) as count
-         FROM orders
-         WHERE order_date >= $1
-         GROUP BY status`,
-        [startDate]
+      const uniqueVisitorsResult = await pool.query(
+        'SELECT COUNT(DISTINCT ip_address) as count FROM log_entries WHERE timestamp >= $1 AND timestamp <= $2',
+        [startDate, endDate]
       );
 
-      // Produits les plus vendus
-      const topProductsResult = await pool.query(
+      // 2. Visites par jour
+      const visitsByDayResult = await pool.query(
+        `SELECT DATE(timestamp) as date, COUNT(*) as count
+         FROM log_entries
+         WHERE timestamp >= $1 AND timestamp <= $2
+         GROUP BY DATE(timestamp)
+         ORDER BY date`,
+        [startDate, endDate]
+      );
+
+      // 3. Visites par heure
+      const visitsByHourResult = await pool.query(
+        `SELECT EXTRACT(HOUR FROM timestamp)::integer as hour, COUNT(*) as count
+         FROM log_entries
+         WHERE timestamp >= $1 AND timestamp <= $2
+         GROUP BY EXTRACT(HOUR FROM timestamp)
+         ORDER BY hour`,
+        [startDate, endDate]
+      );
+
+      // 4. Top IPs
+      const topIpsResult = await pool.query(
         `SELECT 
-           p.id,
-           p.name,
-           SUM(oi.quantity) as total_sold,
-           SUM(oi.total_price) as total_revenue
-         FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
-         JOIN orders o ON oi.order_id = o.id
-         WHERE o.order_date >= $1
-         GROUP BY p.id, p.name
-         ORDER BY total_sold DESC
+           ip_address as ip,
+           COUNT(*) as visits,
+           MIN(timestamp) as first_visit,
+           MAX(timestamp) as last_visit
+         FROM log_entries
+         WHERE timestamp >= $1 AND timestamp <= $2 AND ip_address IS NOT NULL
+         GROUP BY ip_address
+         ORDER BY visits DESC
          LIMIT 10`,
-        [startDate]
+        [startDate, endDate]
       );
 
-      // Nombre total de produits actifs
-      const productsResult = await pool.query(
-        'SELECT COUNT(*) as total_products FROM products WHERE active = true'
-      );
-
-      // Stock total
-      const stockResult = await pool.query(
-        'SELECT COALESCE(SUM(current_quantity), 0) as total_stock FROM stock_batches'
-      );
-
-      // Revenus par jour
-      const revenueByDayResult = await pool.query(
+      // 5. Top Pages
+      const topPagesResult = await pool.query(
         `SELECT 
-           DATE(order_date) as date,
-           COUNT(*) as orders_count,
-           COALESCE(SUM(total_amount), 0) as revenue
-         FROM orders
-         WHERE order_date >= $1
-         GROUP BY DATE(order_date)
-         ORDER BY date DESC`,
-        [startDate]
+           page_url as page,
+           COUNT(*) as visits
+         FROM log_entries
+         WHERE timestamp >= $1 AND timestamp <= $2 AND page_url IS NOT NULL
+         GROUP BY page_url
+         ORDER BY visits DESC
+         LIMIT 10`,
+        [startDate, endDate]
       );
+
+      // 6. Statistiques des commandes
+      const totalOrdersResult = await pool.query(
+        'SELECT COUNT(*) as count FROM orders WHERE order_date >= $1 AND order_date <= $2',
+        [startDate, endDate]
+      );
+
+      const ordersByStatusResult = await pool.query(
+        `SELECT status, COUNT(*) as count
+         FROM orders
+         WHERE order_date >= $1 AND order_date <= $2
+         GROUP BY status`,
+        [startDate, endDate]
+      );
+
+      const ordersByDayResult = await pool.query(
+        `SELECT DATE(order_date) as date, COUNT(*) as count
+         FROM orders
+         WHERE order_date >= $1 AND order_date <= $2
+         GROUP BY DATE(order_date)
+         ORDER BY date`,
+        [startDate, endDate]
+      );
+
+      // 7. Revenus et profits
+      const revenueResult = await pool.query(
+        'SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE order_date >= $1 AND order_date <= $2',
+        [startDate, endDate]
+      );
+
+      // Calculer le coût du stock et le profit
+      const profitResult = await pool.query(
+        `SELECT 
+           COALESCE(SUM(oi.quantity * oi.unit_price), 0) as revenue,
+           COALESCE(SUM(oi.quantity * p.purchase_priceht), 0) as cost
+         FROM order_items oi
+         JOIN orders o ON oi.order_id = o.id
+         JOIN products p ON oi.product_id = p.id
+         WHERE o.order_date >= $1 AND o.order_date <= $2`,
+        [startDate, endDate]
+      );
+
+      const stockCostResult = await pool.query(
+        'SELECT COALESCE(SUM(current_quantity * unit_price), 0) as total FROM stock_batches'
+      );
+
+      const totalStockUnitsResult = await pool.query(
+        'SELECT COALESCE(SUM(current_quantity), 0) as total FROM stock_batches'
+      );
+
+      const totalStockInboundResult = await pool.query(
+        `SELECT COALESCE(SUM(quantity), 0) as total 
+         FROM stock_movements 
+         WHERE type = 'IN' AND movement_date >= $1 AND movement_date <= $2`,
+        [startDate, endDate]
+      );
+
+      // Construire la réponse
+      const revenue = parseFloat(profitResult.rows[0]?.revenue || 0);
+      const cost = parseFloat(profitResult.rows[0]?.cost || 0);
+      const profit = revenue - cost;
+      const stockCost = parseFloat(stockCostResult.rows[0]?.total || 0);
+      const netProfit = profit - stockCost;
+
+      const ordersByStatus: Record<string, number> = {};
+      ordersByStatusResult.rows.forEach(row => {
+        ordersByStatus[row.status] = parseInt(row.count);
+      });
 
       const stats = {
-        period: {
-          days,
-          startDate,
-          endDate: new Date()
-        },
-        orders: {
-          total: parseInt(ordersResult.rows[0].total_orders),
-          revenue: parseFloat(ordersResult.rows[0].total_revenue),
-          averageValue: parseFloat(ordersResult.rows[0].average_order_value)
-        },
-        ordersByStatus: ordersByStatusResult.rows.map(row => ({
-          status: row.status,
+        totalVisits: parseInt(totalVisitsResult.rows[0]?.count || 0),
+        uniqueVisitors: parseInt(uniqueVisitorsResult.rows[0]?.count || 0),
+        visitsByDay: visitsByDayResult.rows.map(row => ({
+          date: row.date,
           count: parseInt(row.count)
         })),
-        topProducts: topProductsResult.rows.map(row => ({
-          id: row.id,
-          name: row.name,
-          totalSold: parseInt(row.total_sold),
-          totalRevenue: parseFloat(row.total_revenue)
+        visitsByHour: visitsByHourResult.rows.map(row => ({
+          hour: row.hour,
+          count: parseInt(row.count)
         })),
-        products: {
-          total: parseInt(productsResult.rows[0].total_products)
-        },
-        stock: {
-          total: parseInt(stockResult.rows[0].total_stock)
-        },
-        revenueByDay: revenueByDayResult.rows.map(row => ({
+        topIps: topIpsResult.rows.map(row => ({
+          ip: row.ip,
+          visits: parseInt(row.visits),
+          firstVisit: row.first_visit,
+          lastVisit: row.last_visit
+        })),
+        topPages: topPagesResult.rows.map(row => ({
+          page: row.page,
+          visits: parseInt(row.visits)
+        })),
+        totalOrders: parseInt(totalOrdersResult.rows[0]?.count || 0),
+        ordersByStatus,
+        ordersByDay: ordersByDayResult.rows.map(row => ({
           date: row.date,
-          ordersCount: parseInt(row.orders_count),
-          revenue: parseFloat(row.revenue)
-        }))
+          count: parseInt(row.count)
+        })),
+        totalRevenue: parseFloat(revenueResult.rows[0]?.total || 0),
+        totalProfit: profit,
+        stockCost,
+        netProfit,
+        totalStockUnits: parseInt(totalStockUnitsResult.rows[0]?.total || 0),
+        totalStockInbound: parseInt(totalStockInboundResult.rows[0]?.total || 0)
       };
 
       res.json(stats);
