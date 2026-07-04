@@ -65,8 +65,8 @@ export class OrderController {
         orderId: item.order_id,
         productId: item.product_id,
         quantity: item.quantity,
-        unitPrice: item.unit_price,
-        totalPrice: item.total_price
+        unitPrice: Number(item.unit_price),
+        totalPrice: Number(item.total_price)
       }));
       res.json(mappedItems);
     } catch (error: any) {
@@ -80,7 +80,7 @@ export class OrderController {
       orderDate: order.order_date,
       status: order.status,
       userId: order.user_id,
-      totalAmount: order.total_amount,
+      totalAmount: Number(order.total_amount),
       firstName: order.first_name,
       lastName: order.last_name,
       address: order.address,
@@ -90,7 +90,7 @@ export class OrderController {
       reference: order.reference,
       city: order.city,
       governorate: order.governorate,
-      deliveryFee: order.delivery_fee
+      deliveryFee: order.delivery_fee ? Number(order.delivery_fee) : null
     };
   }
 }

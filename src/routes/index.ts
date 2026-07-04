@@ -6,6 +6,7 @@ import { OrderController } from '../controllers/OrderController';
 import { StockController } from '../controllers/StockController';
 import { LogController } from '../controllers/LogController';
 import { DashboardController } from '../controllers/DashboardController';
+import { SettingsController } from '../controllers/SettingsController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -18,6 +19,7 @@ const orderController = new OrderController();
 const stockController = new StockController();
 const logController = new LogController();
 const dashboardController = new DashboardController();
+const settingsController = new SettingsController();
 
 // Auth routes (public)
 router.post('/auth/register', authController.register);
@@ -63,5 +65,9 @@ router.post('/logs', logController.createLog);
 router.get('/logs', logController.getAllLogs);
 router.get('/logs/type/:logType', logController.getLogsByType);
 router.get('/logs/ips', logController.getDistinctIpAddresses);
+
+// Settings routes (PUBLIC)
+router.get('/settings/delivery-fee', settingsController.getDeliveryFee);
+router.put('/settings/delivery-fee', settingsController.updateDeliveryFee);
 
 export default router;
