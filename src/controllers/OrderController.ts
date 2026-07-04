@@ -13,7 +13,7 @@ export class OrderController {
     try {
       const request: CheckoutRequest = req.body;
       const order = await this.orderService.placeOrder(request);
-      res.status(200).json(order);
+      res.status(200).json(this.mapOrderToDTO(order));
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -22,7 +22,8 @@ export class OrderController {
   getAllOrders = async (req: Request, res: Response) => {
     try {
       const orders = await this.orderService.getAllOrders();
-      res.json(orders);
+      const mappedOrders = orders.map(order => this.mapOrderToDTO(order));
+      res.json(mappedOrders);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -34,7 +35,7 @@ export class OrderController {
       const { status } = req.body;
       
       const order = await this.orderService.updateOrderStatus(id, status as OrderStatus);
-      res.json(order);
+      res.json(this.mapOrderToDTO(order));
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -49,7 +50,7 @@ export class OrderController {
         return res.status(404).json({ message: 'Order not found' });
       }
       
-      res.json(order);
+      res.json(this.mapOrderToDTO(order));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -59,9 +60,37 @@ export class OrderController {
     try {
       const id = parseInt(req.params.id);
       const items = await this.orderService.getOrderItems(id);
-      res.json(items);
+      const mappedItems = items.map(item => ({
+        id: item.id,
+        orderId: item.order_id,
+        productId: item.product_id,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        totalPrice: item.total_price
+      }));
+      res.json(mappedItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
+
+  private mapOrderToDTO(order: any) {
+    return {
+      id: order.id,
+      orderDate: order.order_date,
+      status: order.status,
+      userId: order.user_id,
+      totalAmount: order.total_amount,
+      firstName: order.first_name,
+      lastName: order.last_name,
+      address: order.address,
+      phone: order.phone,
+      email: order.email,
+      hasStockShortage: order.has_stock_shortage,
+      reference: order.reference,
+      city: order.city,
+      governorate: order.governorate,
+      deliveryFee: order.delivery_fee
+    };
+  }
 }
