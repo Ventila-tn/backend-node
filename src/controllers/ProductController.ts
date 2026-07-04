@@ -128,7 +128,7 @@ export class ProductController {
     }
   };
 
-  // Endpoint séparé pour uploader les images d'un produit
+  // Endpoint pour uploader UNE SEULE image à la fois
   updateProductImages = async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
@@ -138,7 +138,32 @@ export class ProductController {
         return res.status(400).json({ message: 'imageUrls must be an array' });
       }
 
-      console.log('🖼️ Upload images pour produit', id, ':', imageUrls.length, 'images');
+      // LIMITE STRICTE: Une seule image par requête pour Vercel
+      if (imageUrls.length > 1) {
+        return res.status(413).json({
+          error: 'Too many images',
+          message: 'Envoyez une seule image à la fois pour éviter les limites Vercel',
+          maxImages: 1,
+          receivedImages: imageUrls.length
+        });
+      }
+
+      // Vérifier la taille de l'image
+      if (imageUrls.length === 1) {
+        const imageSizeBytes = imageUrls[0].length * 0.75; // Base64 -> bytes
+        const maxSizeBytes = 150 * 1024; // 150KB maximum TRÈS strict pour Vercel
+        
+        if (imageSizeBytes > maxSizeBytes) {
+          return res.status(413).json({
+            error: 'Image too large',
+            message: 'Image doit faire moins de 150KB après compression',
+            maxSizeKB: Math.round(maxSizeBytes / 1024),
+            receivedSizeKB: Math.round(imageSizeBytes / 1024)
+          });
+        }
+      }
+
+      console.log(`🖼️ Upload image pour produit ${id}:`, imageUrls.length, 'image');
 
       // Vérifier que le produit existe
       const product = await this.productService.findById(id);
@@ -146,16 +171,15 @@ export class ProductController {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      // Remplacer toutes les images
-      await this.deleteProductImages(id);
+      // AJOUTER l'image aux existantes (ne pas remplacer)
       if (imageUrls.length > 0) {
         await this.saveProductImages(id, imageUrls);
       }
 
-      // Retourner le produit avec ses nouvelles images
+      // Retourner le produit avec ses images mises à jour
       const result = await this.productService.findByIdWithImages(id);
       const dto = await this.mapToDTOWithImages(result!.product, result!.imageUrls);
-      res.json({ message: 'Images updated successfully', product: dto });
+      res.json({ message: 'Image added successfully', product: dto });
     } catch (error: any) {
       console.error('❌ Erreur updateProductImages:', error);
       res.status(400).json({ message: error.message });
