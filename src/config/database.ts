@@ -3,11 +3,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configuration identique à Spring Boot avec gestion SSL permissive
+// Configuration identique à Spring Boot avec gestion SSL permissive pour Vercel
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Équivalent Spring Boot - accepte les certificats auto-signés
+  ssl: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1' ? {
+    rejectUnauthorized: false // Accepte les certificats auto-signés (comme Supabase)
+  } : {
+    rejectUnauthorized: false
   },
   max: 20,
   idleTimeoutMillis: 30000,
