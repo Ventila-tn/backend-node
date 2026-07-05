@@ -2,7 +2,7 @@ import pool from '../config/database';
 import { Product, ProductRequest } from '../types';
 
 export class ProductService {
-  
+
   /**
    * Formula: sellingPriceTTC = purchasePriceHT * (1 + (profitMarginPercent / 100)) * (1 + (vatPercent / 100))
    */
@@ -10,16 +10,16 @@ export class ProductService {
     const purchasePrice = 'purchasePriceHT' in product ? product.purchasePriceHT : product.purchase_priceht;
     const profitMargin = 'profitMarginPercent' in product ? product.profitMarginPercent : product.profit_margin_percent;
     const vat = 'vatPercent' in product ? product.vatPercent : product.vat_percent;
-    
+
     const marginMultiplier = 1 + (profitMargin / 100);
     const vatMultiplier = 1 + (vat / 100);
-    
+
     return Number((purchasePrice * marginMultiplier * vatMultiplier).toFixed(4));
   }
 
   async createOrUpdateProduct(productData: ProductRequest, id?: number): Promise<Product> {
     const sellingPrice = this.calculateSellingPrice(productData);
-    
+
     if (id) {
       // Update
       const result = await pool.query<Product>(
@@ -40,15 +40,15 @@ export class ProductService {
           productData.profitMarginPercent,
           productData.vatPercent,
           sellingPrice,
-          JSON.stringify(productData.characteristics),
+          productData.characteristics || null,
           id
         ]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error('Product not found');
       }
-      
+
       return result.rows[0];
     } else {
       // Create
@@ -73,10 +73,10 @@ export class ProductService {
           productData.vatPercent,
           sellingPrice,
           true,
-          JSON.stringify(productData.characteristics)
+          productData.characteristics || null
         ]
       );
-      
+
       return result.rows[0];
     }
   }
@@ -86,7 +86,7 @@ export class ProductService {
       'UPDATE products SET active = false WHERE id = $1',
       [id]
     );
-    
+
     if (result.rowCount === 0) {
       throw new Error('Product not found');
     }
@@ -97,11 +97,11 @@ export class ProductService {
       'UPDATE products SET active = true WHERE id = $1 RETURNING *',
       [id]
     );
-    
+
     if (result.rows.length === 0) {
       throw new Error('Product not found');
     }
-    
+
     return result.rows[0];
   }
 
@@ -110,7 +110,7 @@ export class ProductService {
       'SELECT * FROM products WHERE id = $1',
       [id]
     );
-    
+
     return result.rows[0] || null;
   }
 
@@ -118,7 +118,7 @@ export class ProductService {
     const result = await pool.query<Product>(
       'SELECT * FROM products WHERE active = true ORDER BY id'
     );
-    
+
     return result.rows;
   }
 
@@ -126,7 +126,7 @@ export class ProductService {
     const result = await pool.query<Product>(
       'SELECT * FROM products WHERE active = false ORDER BY id'
     );
-    
+
     return result.rows;
   }
 
